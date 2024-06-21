@@ -1,7 +1,6 @@
 fastapi
+joblib
+pandas
+pytest
 uvicorn
 scikit-learn
-pandas
-joblib
-imblearn
-lightgbm
