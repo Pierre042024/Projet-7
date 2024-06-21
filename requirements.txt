@@ -1,6 +1,7 @@
 fastapi
+uvicorn
 joblib
 pandas
-pytest
-uvicorn
 scikit-learn
+imbalanced-learn
+numpy
