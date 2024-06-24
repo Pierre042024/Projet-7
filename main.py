@@ -1,13 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import joblib
 import pandas as pd
-from pydantic import BaseModel
 
 # Charger le modèle enregistré
 model = joblib.load('best_model.joblib')
 
-# Charger les données des clients
-clients_df = pd.read_csv('sampled_dataset.csv')
+# Charger les données des clients avec SK_ID_CURR comme index
+try:
+    clients_df = pd.read_csv('sampled_dataset.csv')
+except ValueError as e:
+    raise ValueError(f"Error reading CSV file: {e}")
 
 # Initialiser l'application FastAPI
 app = FastAPI()
@@ -36,11 +38,11 @@ def get_client_ids():
 @app.get("/predict/{client_id}")
 def predict(client_id: int):
     # Vérifier si le client existe
-    if client_id not in clients_df.index:
+    if client_id not in clients_df['SK_ID_CURR'].values:
         raise HTTPException(status_code=404, detail="Client not found")
     
     # Extraire les données du client
-    client_data = clients_df.loc[client_id].drop(columns=['SK_ID_CURR'])
+    client_data = clients_df[clients_df['SK_ID_CURR'] == client_id].drop(columns=['SK_ID_CURR'])
     
     # Faire une prédiction
     prediction = model.predict(client_data.values.reshape(1, -1))
