@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException
 import joblib
 import pandas as pd
+import shap
+import numpy as np
 
 # Charger le modèle enregistré
 model = joblib.load('best_model.joblib')
@@ -53,6 +55,39 @@ def predict(client_id: int):
         "prediction": int(prediction[0]),
         "probability": float(prediction_proba[0])
     }
+
+# Route pour afficher les 10 features les plus importants avec leurs scores
+@app.get("/top_features")
+def get_top_features():
+    # Sélectionner une instance pour expliquer (optionnel, dépend de votre cas d'utilisation)
+    instance_index = 0
+    instance = X_test_df.iloc[instance_index]
+
+    # Calculer les SHAP values pour cette instance
+    explainer = shap.Explainer(model, clients_df.drop(columns=['SK_ID_CURR']))
+    shap_values = explainer(clients_df.drop(columns=['SK_ID_CURR']))
+
+    # Extraire les noms des features
+    feature_names = clients_df.drop(columns=['SK_ID_CURR']).columns.tolist()
+
+    # Extraire les SHAP values pour l'instance sélectionnée
+    shap_values_instance = shap_values[instance_index]
+
+    # Calculer les scores absolus des SHAP values
+    abs_shap_values = np.abs(shap_values_instance.values)
+
+    # Trier les indices par importance (en utilisant les valeurs absolues)
+    sorted_indices = np.argsort(abs_shap_values)[::-1]
+
+    # Sélectionner les 10 features les plus importants
+    top_indices = sorted_indices[:10]
+    top_features = [feature_names[i] for i in top_indices]
+    top_scores = [shap_values_instance.values[i] for i in top_indices]
+
+    # Créer un dictionnaire pour le tableau JSON
+    result_table = [{"feature": feature, "score": score} for feature, score in zip(top_features, top_scores)]
+
+    return result_table
 
 # Exécution du serveur
 if __name__ == "__main__":
