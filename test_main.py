@@ -18,3 +18,4 @@ def test_get_client_ids():
     response = client.get("/clients")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+    assert len(response.json()) > 0
