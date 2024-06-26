@@ -43,7 +43,7 @@ def predict(client_id: int):
     if client_id not in clients_df['SK_ID_CURR'].values:
         raise HTTPException(status_code=404, detail="Client not found")
     
-    # Extraire les données du client
+    # Extraire les données du client et supprimer la colonne 'SK_ID_CURR'
     client_data = clients_df[clients_df['SK_ID_CURR'] == client_id].drop(columns=['SK_ID_CURR'])
     
     # Faire une prédiction
@@ -57,21 +57,24 @@ def predict(client_id: int):
     }
 
 # Route pour afficher les 10 features les plus importants avec leurs scores
-@app.get("/top_features")
-def get_top_features():
-    # Sélectionner une instance pour expliquer (optionnel, dépend de votre cas d'utilisation)
-    instance_index = 0
-    instance = X_test_df.iloc[instance_index]
+@app.get("/top_features/{client_id}")
+def get_top_features(client_id: int):
+    # Vérifier si le client existe
+    if client_id not in clients_df['SK_ID_CURR'].values:
+        raise HTTPException(status_code=404, detail="Client not found")
 
+    # Extraire les données du client et supprimer la colonne 'SK_ID_CURR'
+    client_data = clients_df[clients_df['SK_ID_CURR'] == client_id].drop(columns=['SK_ID_CURR'])
+    
     # Calculer les SHAP values pour cette instance
     explainer = shap.Explainer(model, clients_df.drop(columns=['SK_ID_CURR']))
-    shap_values = explainer(clients_df.drop(columns=['SK_ID_CURR']))
+    shap_values = explainer(client_data)
 
     # Extraire les noms des features
-    feature_names = clients_df.drop(columns=['SK_ID_CURR']).columns.tolist()
+    feature_names = client_data.columns.tolist()
 
     # Extraire les SHAP values pour l'instance sélectionnée
-    shap_values_instance = shap_values[instance_index]
+    shap_values_instance = shap_values[0]
 
     # Calculer les scores absolus des SHAP values
     abs_shap_values = np.abs(shap_values_instance.values)

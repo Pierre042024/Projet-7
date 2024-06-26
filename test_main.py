@@ -19,3 +19,17 @@ def test_get_client_ids():
     assert response.status_code == 200
     assert isinstance(response.json(), list)
     assert len(response.json()) > 0
+
+def test_predict():
+    # Récupérer la liste des clients
+    response = client.get("/clients")
+    assert response.status_code == 200
+    client_ids = response.json()
+    assert len(client_ids) > 0
+
+def test_top_features():
+    # Récupérer la liste des clients
+    response = client.get("/clients")
+    assert response.status_code == 200
+    client_ids = response.json()
+    assert len(client_ids) > 0
