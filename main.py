@@ -38,7 +38,7 @@ def get_client_ids():
 
 # Route pour faire une prédiction basée sur l'ID du client
 @app.get("/predict/{client_id}")
-def predict(client_id: int):
+async def predict(client_id: int):
     # Vérifier si le client existe
     if client_id not in clients_df['SK_ID_CURR'].values:
         raise HTTPException(status_code=404, detail="Client not found")
