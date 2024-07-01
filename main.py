@@ -37,47 +37,63 @@ def get_client_ids():
     return clients_df['SK_ID_CURR'].tolist()
 
 # Route pour faire une prédiction basée sur l'ID du client
-@app.get("/predict/{client_id}")
+@app.get("/predict")
 async def predict(client_id: int):
     # Vérifier si le client existe
     if client_id not in clients_df['SK_ID_CURR'].values:
         raise HTTPException(status_code=404, detail="Client not found")
     
     # Extraire les données du client et supprimer la colonne 'SK_ID_CURR'
-    client_data = clients_df[clients_df['SK_ID_CURR'] == client_id].drop(columns=['SK_ID_CURR'])
+    client_data = clients_df[clients_df['SK_ID_CURR'] == client_id].drop(columns=['SK_ID_CURR', 'TARGET'])
     
     # Faire une prédiction
     prediction = model.predict(client_data.values.reshape(1, -1))
-    prediction_proba = model.predict_proba(client_data.values.reshape(1, -1))[:, 1]
+    if prediction[0] == 0:
+        prediction_proba = model.predict_proba(client_data.values.reshape(1, -1))[0, 0]
+    else:
+        prediction_proba = model.predict_proba(client_data.values.reshape(1, -1))[0, 1]
 
     # Retourner la prédiction
     return {
+        "client_id": client_id,
         "prediction": int(prediction[0]),
-        "probability": float(prediction_proba[0])
+        "probability": float(prediction_proba)
     }
 
 # Route pour afficher les 10 features les plus importants avec leurs scores
-@app.get("/top_features/{client_id}")
+@app.get("/top_features")
 def get_top_features(client_id: int):
     # Vérifier si le client existe
     if client_id not in clients_df['SK_ID_CURR'].values:
         raise HTTPException(status_code=404, detail="Client not found")
 
     # Extraire les données du client et supprimer la colonne 'SK_ID_CURR'
-    client_data = clients_df[clients_df['SK_ID_CURR'] == client_id].drop(columns=['SK_ID_CURR'])
+    client_data = clients_df[clients_df['SK_ID_CURR'] == client_id].drop(columns=['SK_ID_CURR', 'TARGET'])
     
     # Calculer les SHAP values pour cette instance
-    explainer = shap.Explainer(model, clients_df.drop(columns=['SK_ID_CURR']))
-    shap_values = explainer(client_data)
+    #explainer = shap.Explainer(model, clients_df.drop(columns=['SK_ID_CURR'])) #erreur, lui donner uniquement le classifier du pipeline et aussi retiré la colonne 'TARGET'
+    #shap_values = explainer(client_data)
+    
+    # Extraire le modèle LightGBM du pipeline
+    lgbm_scorer = model.named_steps['classifier']
+
+    # Créer le DataFrame à partir des données de test
+    X_test_df = clients_df.drop(columns=['SK_ID_CURR', 'TARGET'])
+
+    # Fits the explainer
+    explainer = shap.TreeExplainer(lgbm_scorer)
+
+    # Calculates the SHAP values for the instance
+    shap_values = explainer.shap_values(client_data)
 
     # Extraire les noms des features
     feature_names = client_data.columns.tolist()
 
     # Extraire les SHAP values pour l'instance sélectionnée
-    shap_values_instance = shap_values[0]
+    shap_values_instance = shap_values[1][0]
 
     # Calculer les scores absolus des SHAP values
-    abs_shap_values = np.abs(shap_values_instance.values)
+    abs_shap_values = np.abs(shap_values_instance)
 
     # Trier les indices par importance (en utilisant les valeurs absolues)
     sorted_indices = np.argsort(abs_shap_values)[::-1]
@@ -85,7 +101,7 @@ def get_top_features(client_id: int):
     # Sélectionner les 10 features les plus importants
     top_indices = sorted_indices[:10]
     top_features = [feature_names[i] for i in top_indices]
-    top_scores = [shap_values_instance.values[i] for i in top_indices]
+    top_scores = [shap_values_instance[i] for i in top_indices]
 
     # Créer un dictionnaire pour le tableau JSON
     result_table = [{"feature": feature, "score": score} for feature, score in zip(top_features, top_scores)]
